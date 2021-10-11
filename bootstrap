@@ -10,7 +10,6 @@ const bootstrap = function (ofile) {
             return console.log(err);
         }
         const result = ejs.render(data, {
-            addonName: `@eeacms/${currentDir}`,
             name: currentDir
         });
         const output = ofile.replace('.tpl', '');
