@@ -1,7 +1,7 @@
 pipeline {
   environment {
-    RANCHER_STACKID = "1st2298"
-    RANCHER_ENVID = "1a332957"
+    RANCHER_STACKID = ""
+    RANCHER_ENVID = ""
     GIT_NAME = "<%= name %>"
     registry = "eeacms/<%= name %>"
     template = "templates/<%= name %>"
@@ -13,12 +13,12 @@ pipeline {
   agent any
 
   stages {
-    
+
     stage('Integration tests') {
       parallel {
         stage('Integration with Cypress') {
           when {
-            environment name: 'CHANGE_ID', value: ''           
+            environment name: 'CHANGE_ID', value: ''
           }
           steps {
             node(label: 'docker') {
@@ -47,7 +47,7 @@ pipeline {
             }
           }
         }
-        
+
         stage("Docker test build") {
              when {
                not {
@@ -74,12 +74,12 @@ pipeline {
                }
              }
           }
-          
-        
+
+
       }
     }
 
-    
+
     stage('Pull Request') {
       when {
         not {
@@ -102,7 +102,7 @@ pipeline {
       }
     }
 
-  
+
     stage('Release') {
       when {
         allOf {
@@ -145,7 +145,7 @@ pipeline {
         }
       }
     }
-    
+
     stage('Release catalog ( on tag )') {
       when {
         buildingTag()
@@ -158,7 +158,7 @@ pipeline {
         }
       }
     }
-    
+
     stage('Upgrade demo ( on tag )') {
       when {
         buildingTag()
