@@ -11,7 +11,7 @@ RUN runDeps="openssl ca-certificates patch gosu git tmux locales-all" \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* \
  && npm install -g mrs-developer \
- && cp jsconfig.json.tpl jsconfig.json \
+ && cp jsconfig.json.prod jsconfig.json \
  && mkdir -p /opt/frontend/src/addons \
  && rm -rf /opt/frontend/src/addons/* \
  && find /opt/frontend -not -user node -exec chown node {} \+
