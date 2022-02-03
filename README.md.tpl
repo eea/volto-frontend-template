@@ -18,12 +18,12 @@ A training on how to create your own website using Volto is available as part of
         source ~/.bash_profile
         nvm version
 
-1. Install latest `NodeJS 12.x`:
+1. Install latest `NodeJS 16.x`:
 
-        nvm install 12
-        nvm use 12
+        nvm install 16
+        nvm use 16
         node -v
-        v12.16.2
+        v16.16.2
 
 1. Install `yarn`
 
@@ -42,31 +42,13 @@ A training on how to create your own website using Volto is available as part of
 1. Start backend
 
         docker-compose up -d
-        docker-compose logs -f backend
+        docker-compose logs -f
 
 1. Start frontend
 
         yarn start:prod
 
 1. See application at http://localhost:3000
-
-## Try it
-
-1. Install [Docker](https://docs.docker.com/install/)
-1. Install [Docker Compose](https://docs.docker.com/compose/install/)
-1. Start:
-
-        git clone https://github.com/eea/<%= name %>.git
-        cd <%= name %>
-
-        docker-compose pull
-        docker-compose up -d
-
-    optionally change `PORTS` via `.env`:
-
-        FRONTEND=9000 BACKEND=9100 docker-compose up -d
-
-1. See application at http://localhost:4000
 
 ## Production
 
