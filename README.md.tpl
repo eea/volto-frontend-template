@@ -1,7 +1,10 @@
 # <%= name %>
 
-[![Pipeline](https://ci.eionet.europa.eu/buildStatus/icon?job=volto%2F<%= name %>%2Fmaster&subject=pipeline)](https://ci.eionet.europa.eu/view/Github/job/volto/job/<%= name %>/job/master/display/redirect)
 [![Release](https://img.shields.io/github/v/release/eea/<%= name %>?sort=semver)](https://github.com/eea/<%= name %>/releases)
+[![Pipeline](https://ci.eionet.europa.eu/buildStatus/icon?job=volto%2F<%= name %>%2Fmaster&subject=master)](https://ci.eionet.europa.eu/view/Github/job/volto/job/<%= name %>/job/master/lastBuild/display/redirect)
+[![Pipeline](https://ci.eionet.europa.eu/buildStatus/icon?job=volto%2F<%= name %>%2Fdevelop&subject=develop)](https://ci.eionet.europa.eu/view/Github/job/volto/job/<%= name %>/job/develop/lastBuild/display/redirect)
+[![Release pipeline](https://ci.eionet.europa.eu/buildStatus/icon?job=volto%2F<%= name %>%2F0.0.0&build=last&subject=release%20v0.0.0%20pipeline)](https://ci.eionet.europa.eu/view/Github/job/volto/job/<%= name %>/job/0.0.0/lastBuild/display/redirect/)
+
 
 ## Documentation
 
@@ -50,14 +53,25 @@ A training on how to create your own website using Volto is available as part of
 
 1. See application at http://localhost:3000
 
+## Automated @eeacms dependencies upgrades
+
+All the addon dependencies that are located in the dependencies section of `package.json` file that belong to @eeacms and have a `MAJOR.MINOR.PATCH` version are automatically upgraded on the release of a new version of the addon. This upgrade is done directly on the `develop` branch.
+
+Exceptions from automated upgrades ( see https://docs.npmjs.com/cli/v8/configuring-npm/package-json#dependencies for dependency configuration examples ) :
+* All github or local paths
+* Any version intervals ( `^version` or `>version` or `MAJOR.MINOR.x` etc )
+
+## Release
+
+See [release](https://github.com/eea/ims-frontend/tree/master/RELEASE.md)
+
 ## Production
 
 We use [Docker](https://www.docker.com/), [Rancher](https://rancher.com/) and [Jenkins](https://jenkins.io/) to deploy this application in production.
 
-### Release
+### Deploy
 
-* Create a new release of this code via `git tag` command or [Draft new release](https://github.com/eea/<%= name %>/releases/new) on Github.
-  * A new Docker image is built and released automatically on [DockerHub](https://hub.docker.com/r/eeacms/<%= name %>) based on this tag.
+* Within `Rancher > Catalog > EEA`
 
 ### Upgrade
 
