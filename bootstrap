@@ -4,38 +4,49 @@ const ejs = require('ejs');
 
 const currentDir = path.basename(process.cwd());
 
-const bootstrap = function (ofile) {
+function isKnownBinaryExtension(extension) {
+  const binaryExtensions = ['.png', '.jpg', '.gif', '.svg', '.ico', '.pdf']; // add more if needed
+  return binaryExtensions.includes(extension);
+}
+
+function bootstrap(ofile) {
   fs.readFile(ofile, 'utf8', function (err, data) {
+    const ext = path.extname(ofile);
+    if (ext !== '.tpl') return;
     if (err) {
       return console.log(err);
     }
-    const result = ejs.render(data, {
-      name: currentDir,
-    });
     const output = ofile.replace('.tpl', '');
+    const isBinary = isKnownBinaryExtension(path.extname(output));
+    const result = isBinary
+      ? data
+      : ejs.render(data, {
+          name: currentDir,
+        });
     fs.writeFile(output, result, 'utf8', function (err) {
       if (err) {
         return console.log(err);
       }
     });
-    if (ofile.includes('.tpl')) {
-      fs.unlink(ofile, (err) => {
-        if (err) {
-          return console.error(err);
-        }
-      });
-    }
+    fs.unlink(ofile, (err) => {
+      if (err) {
+        return console.error(err);
+      }
+    });
   });
-};
+}
 
-fs.readdir('.', { withFileTypes: true }, (err, dirents) => {
-  const files = dirents
-    .filter((dirent) => dirent.isFile())
-    .map((dirent) => dirent.name);
-  files.forEach(function (file) {
-    if (file != 'bootstrap') {
-      bootstrap(file);
-    }
+function parse_tpl(folder) {
+  fs.readdir(folder, { withFileTypes: true }, (err, dirents) => {
+    dirents.forEach(function (file) {
+      if (file.isFile() && file.name != 'bootstrap') {
+        bootstrap(`${folder}/${file.name}`);
+      }
+      if (file.isDirectory() && !['.git', 'node_modules'].includes(file.name)) {
+        parse_tpl(`${folder}/${file.name}`);
+      }
+    });
   });
-  bootstrap('./cypress/support/commands.js.tpl');
-});
+}
+
+parse_tpl('.');
