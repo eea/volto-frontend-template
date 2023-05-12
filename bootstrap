@@ -1,29 +1,27 @@
-const path = require("path");
-const fs = require("fs");
-const ejs = require("ejs");
+const path = require('path');
+const fs = require('fs');
+const ejs = require('ejs');
 
 const currentDir = path.basename(process.cwd());
 
 function isKnownBinaryExtension(extension) {
-  const binaryExtensions = [".png", ".jpg", ".gif", ".svg", ".ico", ".pdf"]; // add more if needed
+  const binaryExtensions = ['.png', '.jpg', '.gif', '.svg', '.ico', '.pdf']; // add more if needed
   return binaryExtensions.includes(extension);
 }
 
 function bootstrap(ofile) {
-  fs.readFile(ofile, "utf8", function (err, data) {
-    const ext = path.extname(ofile);
-    if (ext !== ".tpl") return;
+  fs.readFile(ofile, 'utf8', function (err, data) {
     if (err) {
       return console.log(err);
     }
-    const output = ofile.replace(".tpl", "");
+    const output = ofile.replace('.tpl', '');
     const isBinary = isKnownBinaryExtension(path.extname(output));
     const result = isBinary
       ? data
       : ejs.render(data, {
           name: currentDir,
         });
-    fs.writeFile(output, result, "utf8", function (err) {
+    fs.writeFile(output, result, 'utf8', function (err) {
       if (err) {
         return console.log(err);
       }
@@ -39,14 +37,15 @@ function bootstrap(ofile) {
 function parse_tpl(folder) {
   fs.readdir(folder, { withFileTypes: true }, (err, dirents) => {
     dirents.forEach(function (file) {
-      if (file.isFile() && file.name != "bootstrap") {
+      const ext = path.extname(file.name);
+      if (file.isFile() && file.name != 'bootstrap' && ext=='.tpl') {
         bootstrap(`${folder}/${file.name}`);
       }
-      if (file.isDirectory() && ![".git", "node_modules"].includes(file.name)) {
+      if (file.isDirectory() && !['.git', 'node_modules'].includes(file.name)) {
         parse_tpl(`${folder}/${file.name}`);
       }
     });
   });
 }
 
-parse_tpl(".");
+parse_tpl('.');
