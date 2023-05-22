@@ -1,8 +1,14 @@
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 const ejs = require('ejs');
+const { createReadStream, createWriteStream } = require('fs');
+const { pipeline } = require('stream');
+const sharp = require('sharp');
+const pngToIco = require('png-to-ico');
+const xml2js = require('xml2js');
 
 const currentDir = path.basename(process.cwd());
+const inputImagePath = 'public/icon.png';
 
 function isKnownBinaryExtension(extension) {
   const binaryExtensions = ['.png', '.jpg', '.gif', '.svg', '.ico', '.pdf']; // add more if needed
@@ -38,7 +44,7 @@ function parse_tpl(folder) {
   fs.readdir(folder, { withFileTypes: true }, (err, dirents) => {
     dirents.forEach(function (file) {
       const ext = path.extname(file.name);
-      if (file.isFile() && file.name != 'bootstrap' && ext=='.tpl') {
+      if (file.isFile() && file.name != 'bootstrap' && ext == '.tpl') {
         bootstrap(`${folder}/${file.name}`);
       }
       if (file.isDirectory() && !['.git', 'node_modules'].includes(file.name)) {
@@ -49,3 +55,114 @@ function parse_tpl(folder) {
 }
 
 parse_tpl('.');
+
+// Modify the width and height of the SVG for better quality images
+function resizeSVG() {
+  fs.readFile('public/icon.svg', 'utf8', function (err, data) {
+    if (err) {
+      console.log('Could not open file: %s', err);
+      return;
+    }
+
+    xml2js.parseString(data, function (err, result) {
+      if (err) {
+        console.log('Could not parse SVG: %s', err);
+        return;
+      }
+      // Assume that the root SVG element is result.svg and it has width and height attributes
+      if (result.svg.$) {
+        // Set new width and height
+        result.svg.$.width = '512';
+        result.svg.$.height = '512';
+
+        // Build an XML string (SVG)
+        var builder = new xml2js.Builder();
+        let newSvg = builder.buildObject(result);
+        fs.writeFile('public/icon.svg', newSvg, function (err) {
+          if (err) {
+            console.log('Could not write file: %s', err);
+          } else {
+            console.log('SVG file was saved!');
+            convertSVGtoPNG();
+          }
+        });
+      } else {
+        console.log('SVG root element or its attributes not found.');
+      }
+    });
+  });
+}
+
+// Convert SVG to PNG
+function convertSVGtoPNG() {
+  sharp('public/icon.svg')
+    .png()
+    .toFile('public/icon.png')
+    .then(function () {
+      resizeImages();
+    })
+    .catch(function (err) {
+      console.log(err);
+    });
+}
+
+function resizeImages() {
+  // Create a readable stream from the input image file
+  const readStream = createReadStream(inputImagePath);
+
+  // Generate ICO file
+  const outputIcoPath = 'public/favicon.ico';
+  pngToIco(inputImagePath, outputIcoPath)
+    .then((buf) => {
+      fs.writeFileSync(outputIcoPath, buf);
+      console.log('PNG image converted to ICO:', outputIcoPath);
+    })
+    .catch((err) => {
+      console.error('Error converting PNG to ICO:', err);
+    });
+
+  // Dimensions for resizing favicons
+  const dimensionsFavicons = [
+    { width: 16, height: 16, title: 'favicon', opacity: '0' },
+    { width: 32, height: 32, title: 'favicon', opacity: '0' },
+    { width: 192, height: 192, title: 'android-chrome', opacity: '100' },
+    { width: 512, height: 512, title: 'android-chrome', opacity: '100' },
+    { width: 180, height: 180, title: 'apple-touch-icon', opacity: '100' },
+    // Add more dimensions as needed
+  ];
+
+  // Resize and create new files
+  dimensionsFavicons.forEach((dimension, index) => {
+    const { width, height, title, opacity } = dimension;
+    const outputImagePath =
+      title !== 'apple-touch-icon'
+        ? `public/${title}-${width}x${height}.png`
+        : `public/${title}.png`;
+
+    // Create a writable stream to the output image file
+    const writeStream = createWriteStream(outputImagePath);
+
+    // Use sharp to resize the image
+    const transformer = sharp()
+      .resize(width, height)
+      .flatten({
+        background:
+          opacity === '100' ? { r: 255, g: 255, b: 255 } : 'transparent',
+      });
+
+    // Pipeline to stream data from the input file to the output file with resizing
+    pipeline(readStream, transformer, writeStream, (err) => {
+      if (err) {
+        console.error('Error processing image:', err);
+      } else {
+        console.log(
+          `Resized image ${index + 1}/${
+            dimensionsFavicons.length
+          } created: ${outputImagePath}`
+        );
+      }
+    });
+  });
+}
+
+resizeSVG();
