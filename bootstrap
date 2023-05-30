@@ -54,9 +54,7 @@ function parse_tpl(folder) {
   });
 }
 
-parse_tpl('.');
-
-// Modify the width and height of the SVG for better quality images
+// Modifing the width and height of the SVG for better quality images
 function resizeSVG() {
   fs.readFile('public/icon.svg', 'utf8', function (err, data) {
     if (err) {
@@ -83,7 +81,7 @@ function resizeSVG() {
             console.log('Could not write file: %s', err);
           } else {
             console.log('SVG file was saved!');
-            convertSVGtoPNG();
+            convertSVGtoPNG('public/icon.svg', 'public/icon.png');
           }
         });
       } else {
@@ -94,19 +92,19 @@ function resizeSVG() {
 }
 
 // Convert SVG to PNG
-function convertSVGtoPNG() {
-  sharp('public/icon.svg')
-    .png()
-    .toFile('public/icon.png')
-    .then(function () {
-      resizeImages();
-    })
-    .catch(function (err) {
-      console.log(err);
+function convertSVGtoPNG(svgPath, pngPath) {
+  const promise = sharp(svgPath).png().toFile(pngPath);
+
+  // If the convertSVGtoPNG function is called with parameters from cli, don't call the resizePNG function
+  if (svgPath !== process.argv[3] && pngPath !== process.argv[4]) {
+    promise.then(function () {
+      resizePNG();
     });
+  }
+  return promise;
 }
 
-function resizeImages() {
+function resizePNG() {
   // Create a readable stream from the input image file
   const readStream = createReadStream(inputImagePath);
 
@@ -134,10 +132,7 @@ function resizeImages() {
   // Resize and create new files
   dimensionsFavicons.forEach((dimension, index) => {
     const { width, height, title, opacity } = dimension;
-    const outputImagePath =
-      title !== 'apple-touch-icon'
-        ? `public/${title}-${width}x${height}.png`
-        : `public/${title}.png`;
+    const outputImagePath = title !== 'apple-touch-icon' ? `public/${title}-${width}x${height}.png` : `public/${title}.png`;
 
     // Create a writable stream to the output image file
     const writeStream = createWriteStream(outputImagePath);
@@ -146,8 +141,7 @@ function resizeImages() {
     const transformer = sharp()
       .resize(width, height)
       .flatten({
-        background:
-          opacity === '100' ? { r: 255, g: 255, b: 255 } : 'transparent',
+        background: opacity === '100' ? { r: 255, g: 255, b: 255 } : 'transparent',
       });
 
     // Pipeline to stream data from the input file to the output file with resizing
@@ -155,14 +149,65 @@ function resizeImages() {
       if (err) {
         console.error('Error processing image:', err);
       } else {
-        console.log(
-          `Resized image ${index + 1}/${
-            dimensionsFavicons.length
-          } created: ${outputImagePath}`
-        );
+        console.log(`Resized image ${index + 1}/${dimensionsFavicons.length} created: ${outputImagePath}`);
       }
     });
   });
 }
 
-resizeSVG();
+function resizePNGtoCustomDimension(inputPath, dimensionsArray, outputPath) {
+  const readStream = createReadStream(inputPath);
+
+  const writeStream = createWriteStream(outputPath);
+  const width = dimensionsArray.split(',')[0];
+  const height = dimensionsArray.split(',')[1];
+
+  const transformer = sharp().resize(parseInt(width), parseInt(height));
+
+  pipeline(readStream, transformer, writeStream, (err) => {
+    if (err) {
+      console.error('Error processing image:', err);
+    } else {
+      console.log(`Resized png. Created: ${outputPath}`);
+    }
+  });
+}
+
+function changeBackgroundColor(inputPath, rgbArray, outputPath) {
+  const readStream = createReadStream(inputPath);
+  const r = rgbArray.split(',')[0];
+  const g = rgbArray.split(',')[1];
+  const b = rgbArray.split(',')[2];
+
+  const writeStream = createWriteStream(outputPath);
+
+  const transformer = sharp().flatten({
+    background: { r: parseInt(r), g: parseInt(g), b: parseInt(b) },
+  });
+
+  pipeline(readStream, transformer, writeStream, (err) => {
+    if (err) {
+      console.error('Error processing image:', err);
+    } else {
+      console.log(`Backgound color changed. Created: ${outputPath}`);
+    }
+  });
+}
+
+const command = process.argv.length >= 2 ? process.argv[2] || 'default' : 'default';
+
+switch (command) {
+  case 'default':
+    parse_tpl('.');
+    resizeSVG();
+    break;
+  case 'svgtopng':
+    convertSVGtoPNG(process.argv[3], process.argv[4]);
+    break;
+  case 'resizepng':
+    resizePNGtoCustomDimension(process.argv[3], process.argv[4], process.argv[5]);
+    break;
+  case 'chagebackgroundcolor':
+    changeBackgroundColor(process.argv[3], process.argv[4], process.argv[5]);
+    break;
+}
