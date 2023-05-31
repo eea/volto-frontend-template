@@ -56,7 +56,7 @@ function parse_tpl(folder) {
 
 // Modifing the width and height of the SVG for better quality images
 function resizeSVG() {
-  fs.readFile('public/icon.svg', 'utf8', function (err, data) {
+  fs.readFile('public/icon.svg.tpl', 'utf8', function (err, data) {
     if (err) {
       console.log('Could not open file: %s', err);
       return;
@@ -76,12 +76,12 @@ function resizeSVG() {
         // Build an XML string (SVG)
         var builder = new xml2js.Builder();
         let newSvg = builder.buildObject(result);
-        fs.writeFile('public/icon.svg', newSvg, function (err) {
+        fs.writeFile('public/icon.svg.tpl', newSvg, function (err) {
           if (err) {
             console.log('Could not write file: %s', err);
           } else {
             console.log('SVG file was saved!');
-            convertSVGtoPNG('public/icon.svg', 'public/icon.png');
+            convertSVGtoPNG('public/icon.svg.tpl', 'public/icon.png');
           }
         });
       } else {
@@ -198,8 +198,8 @@ const command = process.argv.length >= 2 ? process.argv[2] || 'default' : 'defau
 
 switch (command) {
   case 'default':
-    parse_tpl('.');
     resizeSVG();
+    parse_tpl('.');
     break;
   case 'svgtopng':
     convertSVGtoPNG(process.argv[3], process.argv[4]);
