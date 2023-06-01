@@ -1,41 +1,213 @@
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 const ejs = require('ejs');
+const { createReadStream, createWriteStream } = require('fs');
+const { pipeline } = require('stream');
+const sharp = require('sharp');
+const pngToIco = require('png-to-ico');
+const xml2js = require('xml2js');
 
 const currentDir = path.basename(process.cwd());
+const inputImagePath = 'public/icon.png';
 
-const bootstrap = function (ofile) {
+function isKnownBinaryExtension(extension) {
+  const binaryExtensions = ['.png', '.jpg', '.gif', '.svg', '.ico', '.pdf']; // add more if needed
+  return binaryExtensions.includes(extension);
+}
+
+function bootstrap(ofile) {
   fs.readFile(ofile, 'utf8', function (err, data) {
     if (err) {
       return console.log(err);
     }
-    const result = ejs.render(data, {
-      name: currentDir,
-    });
     const output = ofile.replace('.tpl', '');
+    const isBinary = isKnownBinaryExtension(path.extname(output));
+    const result = isBinary
+      ? data
+      : ejs.render(data, {
+          name: currentDir,
+        });
     fs.writeFile(output, result, 'utf8', function (err) {
       if (err) {
         return console.log(err);
       }
     });
-    if (ofile.includes('.tpl')) {
-      fs.unlink(ofile, (err) => {
-        if (err) {
-          return console.error(err);
-        }
-      });
-    }
+    fs.unlink(ofile, (err) => {
+      if (err) {
+        return console.error(err);
+      }
+    });
   });
-};
+}
 
-fs.readdir('.', { withFileTypes: true }, (err, dirents) => {
-  const files = dirents
-    .filter((dirent) => dirent.isFile())
-    .map((dirent) => dirent.name);
-  files.forEach(function (file) {
-    if (file != 'bootstrap') {
-      bootstrap(file);
+function parse_tpl(folder) {
+  fs.readdir(folder, { withFileTypes: true }, (err, dirents) => {
+    dirents.forEach(function (file) {
+      const ext = path.extname(file.name);
+      if (file.isFile() && file.name != 'bootstrap' && ext == '.tpl') {
+        bootstrap(`${folder}/${file.name}`);
+      }
+      if (file.isDirectory() && !['.git', 'node_modules'].includes(file.name)) {
+        parse_tpl(`${folder}/${file.name}`);
+      }
+    });
+  });
+}
+
+// Modifing the width and height of the SVG for better quality images
+function resizeSVG() {
+  fs.readFile('public/icon.svg.tpl', 'utf8', function (err, data) {
+    if (err) {
+      console.log('Could not open file: %s', err);
+      return;
+    }
+
+    xml2js.parseString(data, function (err, result) {
+      if (err) {
+        console.log('Could not parse SVG: %s', err);
+        return;
+      }
+      // Assume that the root SVG element is result.svg and it has width and height attributes
+      if (result.svg.$) {
+        // Set new width and height
+        result.svg.$.width = '512';
+        result.svg.$.height = '512';
+
+        // Build an XML string (SVG)
+        var builder = new xml2js.Builder();
+        let newSvg = builder.buildObject(result);
+        fs.writeFile('public/icon.svg.tpl', newSvg, function (err) {
+          if (err) {
+            console.log('Could not write file: %s', err);
+          } else {
+            console.log('SVG file was saved!');
+            convertSVGtoPNG('public/icon.svg.tpl', 'public/icon.png');
+          }
+        });
+      } else {
+        console.log('SVG root element or its attributes not found.');
+      }
+    });
+  });
+}
+
+// Convert SVG to PNG
+function convertSVGtoPNG(svgPath, pngPath) {
+  const promise = sharp(svgPath).png().toFile(pngPath);
+
+  // If the convertSVGtoPNG function is called with parameters from cli, don't call the resizePNG function
+  if (svgPath !== process.argv[3] && pngPath !== process.argv[4]) {
+    promise.then(function () {
+      resizePNG();
+    });
+  }
+  return promise;
+}
+
+function resizePNG() {
+  // Create a readable stream from the input image file
+  const readStream = createReadStream(inputImagePath);
+
+  // Generate ICO file
+  const outputIcoPath = 'public/favicon.ico';
+  pngToIco(inputImagePath, outputIcoPath)
+    .then((buf) => {
+      fs.writeFileSync(outputIcoPath, buf);
+      console.log('PNG image converted to ICO:', outputIcoPath);
+    })
+    .catch((err) => {
+      console.error('Error converting PNG to ICO:', err);
+    });
+
+  // Dimensions for resizing favicons
+  const dimensionsFavicons = [
+    { width: 16, height: 16, title: 'favicon', opacity: '0' },
+    { width: 32, height: 32, title: 'favicon', opacity: '0' },
+    { width: 192, height: 192, title: 'android-chrome', opacity: '100' },
+    { width: 512, height: 512, title: 'android-chrome', opacity: '100' },
+    { width: 180, height: 180, title: 'apple-touch-icon', opacity: '100' },
+    // Add more dimensions as needed
+  ];
+
+  // Resize and create new files
+  dimensionsFavicons.forEach((dimension, index) => {
+    const { width, height, title, opacity } = dimension;
+    const outputImagePath = title !== 'apple-touch-icon' ? `public/${title}-${width}x${height}.png` : `public/${title}.png`;
+
+    // Create a writable stream to the output image file
+    const writeStream = createWriteStream(outputImagePath);
+
+    // Use sharp to resize the image
+    const transformer = sharp()
+      .resize(width, height)
+      .flatten({
+        background: opacity === '100' ? { r: 255, g: 255, b: 255 } : 'transparent',
+      });
+
+    // Pipeline to stream data from the input file to the output file with resizing
+    pipeline(readStream, transformer, writeStream, (err) => {
+      if (err) {
+        console.error('Error processing image:', err);
+      } else {
+        console.log(`Resized image ${index + 1}/${dimensionsFavicons.length} created: ${outputImagePath}`);
+      }
+    });
+  });
+}
+
+function resizePNGtoCustomDimension(inputPath, dimensionsArray, outputPath) {
+  const readStream = createReadStream(inputPath);
+
+  const writeStream = createWriteStream(outputPath);
+  const width = dimensionsArray.split(',')[0];
+  const height = dimensionsArray.split(',')[1];
+
+  const transformer = sharp().resize(parseInt(width), parseInt(height));
+
+  pipeline(readStream, transformer, writeStream, (err) => {
+    if (err) {
+      console.error('Error processing image:', err);
+    } else {
+      console.log(`Resized png. Created: ${outputPath}`);
     }
   });
-  bootstrap('./cypress/support/commands.js.tpl');
-});
+}
+
+function changeBackgroundColor(inputPath, rgbArray, outputPath) {
+  const readStream = createReadStream(inputPath);
+  const r = rgbArray.split(',')[0];
+  const g = rgbArray.split(',')[1];
+  const b = rgbArray.split(',')[2];
+
+  const writeStream = createWriteStream(outputPath);
+
+  const transformer = sharp().flatten({
+    background: { r: parseInt(r), g: parseInt(g), b: parseInt(b) },
+  });
+
+  pipeline(readStream, transformer, writeStream, (err) => {
+    if (err) {
+      console.error('Error processing image:', err);
+    } else {
+      console.log(`Backgound color changed. Created: ${outputPath}`);
+    }
+  });
+}
+
+const command = process.argv.length >= 2 ? process.argv[2] || 'default' : 'default';
+
+switch (command) {
+  case 'default':
+    resizeSVG();
+    parse_tpl('.');
+    break;
+  case 'svgtopng':
+    convertSVGtoPNG(process.argv[3], process.argv[4]);
+    break;
+  case 'resizepng':
+    resizePNGtoCustomDimension(process.argv[3], process.argv[4], process.argv[5]);
+    break;
+  case 'chagebackgroundcolor':
+    changeBackgroundColor(process.argv[3], process.argv[4], process.argv[5]);
+    break;
+}
